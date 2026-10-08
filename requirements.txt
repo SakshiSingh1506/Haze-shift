@@ -1,0 +1,10 @@
+torch
+torchvision
+pyyaml
+pillow
+numpy
+scipy
+lpips
+pyiqa
+kaggle
+tqdm

@@ -1,0 +1,57 @@
+protocol: A
+description: "Lightweight protocol: ITS (indoor) -> SOTS-indoor in-domain, RTTS unsupervised, NH-HAZE zero-shot test"
+
+paths:
+  reside_root: data/RESIDE
+  its_train: data/RESIDE/ITS           # RESIDE indoor training set (13,990 imgs)
+  sots_indoor: data/RESIDE/SOTS/indoor # 500 imgs
+  rtts: data/RESIDE/RTTS               # 4,322 unlabeled real hazy imgs
+  nh_haze: data/NH-HAZE                # 55 pairs; only official 5-image test split used
+  checkpoints: checkpoints/protocol_a
+  results: results/protocol_a
+
+data:
+  crop_size: 256
+  batch_size: 16          # fits T4 16GB at 256x256 with this model size
+  num_workers: 2
+
+model:
+  backbone: hazeshiftnet       # custom encoder + 3 heads (src/model.py), base=48, 13.5M params
+  base: 48
+  n_res: 3
+  pretrained_checkpoint: null  # trained from scratch: DehazeFormer weights don't map onto this architecture
+  uncertainty: true
+  ema_teacher: true
+  ema_decay: 0.999
+
+stage1:
+  epochs: 12   # equal step budgets: A 12 x 874 = 10,488 steps; B 28 x 375 = 10,500 steps (~0.95 s/step AMP on T4 -> ~2.8 h)
+  val_max_images: 100   # per-epoch model selection on first 100 SOTS images; final eval uses all 500
+  lr: 2.0e-4
+  optimizer: adamw
+  scheduler: cosine
+  loss_weights:
+    l1: 1.0
+    ssim: 0.5
+    perceptual: 0.1
+    physical_consistency: 0.1
+
+stage2:
+  epochs: 8   # 8 x 270 = 2,160 steps on RTTS
+  lr: 5.0e-5
+  optimizer: adamw
+  loss_weights:
+    uncertainty_consistency: 1.0
+    dark_channel_prior: 0.1
+    bright_channel_prior: 0.05
+    tv_transmission: 0.01
+    ema_distillation: 0.2
+
+eval:
+  nh_haze_split: official_test   # 5 images only, per course decision
+  report_full_nh_haze_niqe: true # secondary, no-reference, steadier stat over all 55
+  metrics: [psnr, ssim, lpips, niqe]
+  rtts_niqe_max_images: 1000   # NIQE on first 1,000 of 4,322 RTTS images (time budget)
+
+seed: 42
+amp: true   # mixed precision on CUDA (T4 tensor cores)

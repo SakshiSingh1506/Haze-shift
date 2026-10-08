@@ -1,0 +1,64 @@
+protocol: B
+description: "[H200 settings] Literature-standard protocol: RESIDE-6K outdoor split (OTS6K) -> SOTS-outdoor in-domain, RTTS unsupervised, NH-HAZE zero-shot test. Only the synthetic training domain differs from protocol A."
+# NOTE: uses the RESIDE-6K outdoor training set (6,000 pairs, a widely-used
+# curated subset of the full OTS) rather than the full 313,950-image / ~45GB
+# OTS -- same outdoor domain, tractable on a single Colab GPU. Verified
+# downloaded via Kaggle (kmljts/reside-6k) 2026-10-07: train/hazy and
+# train/GT each have exactly 6,000 matching-filename pairs.
+
+paths:
+  reside_root: data/RESIDE
+  ots_train: data/RESIDE/OTS6K/train     # RESIDE-6K outdoor training set (6,000 pairs)
+  sots_outdoor: data/RESIDE/SOTS/outdoor # 500 imgs
+  rtts: data/RESIDE/RTTS                # identical to protocol A
+  nh_haze: data/NH-HAZE                 # identical to protocol A; only official 5-image test used
+  checkpoints: checkpoints/h200/protocol_b
+  results: results/h200/protocol_b
+
+data:
+  crop_size: 256
+  batch_size: 32
+  num_workers: 16          # run_h200.sh lowers this if the machine has fewer CPU cores
+
+model:
+  backbone: hazeshiftnet       # custom encoder + 3 heads (src/model.py), base=48, 13.5M params
+  base: 48
+  n_res: 3
+  pretrained_checkpoint: null  # trained from scratch: DehazeFormer weights don't map onto this architecture
+  uncertainty: true
+  ema_teacher: true
+  ema_decay: 0.999
+
+stage1:
+  epochs: 70   # H200 equal step budgets at batch 32: A 30 x 437 = 13,110 steps; B 70 x 187 = 13,090 steps
+  val_max_images: null   # all 500 SOTS images every epoch (cheap on H200)
+  lr: 3.0e-4   # batch 16 -> 32: sqrt scaling of the T4 lr (2e-4)
+  optimizer: adamw
+  scheduler: cosine
+  loss_weights:
+    l1: 1.0
+    ssim: 0.5
+    perceptual: 0.1
+    physical_consistency: 0.1
+
+stage2:
+  epochs: 15   # 15 x 135 = 2,025 steps on RTTS at batch 32
+  lr: 7.0e-5   # sqrt scaling of the T4 lr (5e-5)
+  optimizer: adamw
+  loss_weights:
+    uncertainty_consistency: 1.0
+    dark_channel_prior: 0.1
+    bright_channel_prior: 0.05
+    tv_transmission: 0.01
+    ema_distillation: 0.2
+
+eval:
+  nh_haze_split: official_test
+  report_full_nh_haze_niqe: true
+  metrics: [psnr, ssim, lpips, niqe]
+  rtts_niqe_max_images: 1000   # NIQE on first 1,000 of 4,322 RTTS images (time budget)
+
+seed: 42
+amp: true
+amp_dtype: bfloat16   # H200: bf16 autocast, no GradScaler needed
+channels_last: true

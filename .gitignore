@@ -1,0 +1,15 @@
+data/RESIDE/
+data/RESIDE_raw/
+data/NH-HAZE/
+data/NH-HAZE_raw/
+checkpoints/
+results/dryrun/
+logs/
+*.part
+.sync_state.json
+__pycache__/
+*.pyc
+.kaggle_token
+.venv/
+*.tar.gz
+**/visuals/*/
