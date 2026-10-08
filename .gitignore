@@ -9,6 +9,7 @@ logs/
 .sync_state.json
 __pycache__/
 *.pyc
+
 .kaggle_token
 .venv/
 *.tar.gz

@@ -9,6 +9,7 @@
 #
 # Needs: Linux, NVIDIA driver, python3 (3.10+), internet, ~20 GB free disk,
 # and a Kaggle API token, given one of these ways:
+#   .kaggle_token file in this folder (shipped with the package; used automatically), or
 #   export KAGGLE_API_TOKEN=KGAT_...          (written to ~/.kaggle/access_token), or
 #   ~/.kaggle/access_token already present, or
 #   ~/.kaggle/kaggle.json (legacy username/key)
@@ -42,17 +43,23 @@ PY="${PYTHON:-python3}"
   || { echo "need python >= 3.10 (set PYTHON=/path/to/python3.x)"; exit 1; }
 
 # ---------------------------------------------------------------- 2. python env
+# A venv has its folder path baked in; if this folder was moved or renamed, rebuild it.
+if [ -d .venv ] && ! head -c 400 .venv/bin/pip 2>/dev/null | grep -qF "$ROOT/.venv/bin/python"; then
+  say "existing .venv belongs to another folder path (folder was moved/renamed); rebuilding it"
+  rm -rf .venv
+fi
 if [ ! -d .venv ]; then
   say "creating virtualenv .venv"
   "$PY" -m venv .venv
 fi
 # shellcheck disable=SC1091
 source .venv/bin/activate
+VPY="$ROOT/.venv/bin/python"               # always this interpreter, never conda's
 say "installing packages (PyTorch with CUDA, then project requirements)"
-pip install -q --upgrade pip
-pip install -q torch torchvision           # Linux x86_64 wheels from PyPI ship with CUDA
-pip install -q -r requirements.txt
-python - << 'EOF'
+"$VPY" -m pip install -q --upgrade pip
+"$VPY" -m pip install -q torch torchvision     # Linux x86_64 wheels from PyPI ship with CUDA
+"$VPY" -m pip install -q -r requirements.txt
+"$VPY" - << 'EOF'
 import torch
 assert torch.cuda.is_available(), "PyTorch cannot see the GPU -- check the driver / CUDA wheel"
 print(f"torch {torch.__version__} | GPU {torch.cuda.get_device_name(0)} | bf16 {torch.cuda.is_bf16_supported()}")
@@ -60,6 +67,9 @@ EOF
 
 # ---------------------------------------------------------------- 3. kaggle token
 mkdir -p ~/.kaggle
+if [ -z "${KAGGLE_API_TOKEN:-}" ] && [ -s .kaggle_token ]; then
+  KAGGLE_API_TOKEN="$(tr -d '[:space:]' < .kaggle_token)"
+fi
 if [ -n "${KAGGLE_API_TOKEN:-}" ]; then
   printf '%s' "$KAGGLE_API_TOKEN" > ~/.kaggle/access_token
 fi

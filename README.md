@@ -152,7 +152,7 @@ tail -f logs/pipeline.log              # (after a sync) follow progress
 ## Running on an H200 (or any Linux CUDA server)
 
 ```bash
-export KAGGLE_API_TOKEN=KGAT_...      # your Kaggle API token
+# Kaggle token is read from .kaggle_token in this folder (or export KAGGLE_API_TOKEN=...)
 bash run_h200.sh --smoke              # ~2 min: checks env, data and the whole chain
 bash run_h200.sh                      # full plan in the background (survives logout)
 tail -f logs/h200_pipeline.log

@@ -26,7 +26,8 @@ echo "== packaging code"
 rm -f /tmp/haze_code.zip /tmp/haze_state.zip
 zip -rq /tmp/haze_code.zip src configs scripts colab data/*.py requirements.txt
 "$COLAB" upload -s "$S" /tmp/haze_code.zip haze_code.zip
-"$COLAB" upload -s "$S" "$HOME/.kaggle/access_token" kaggle_access_token
+TOKEN_FILE=".kaggle_token"; [ -s "$TOKEN_FILE" ] || TOKEN_FILE="$HOME/.kaggle/access_token"
+"$COLAB" upload -s "$S" "$TOKEN_FILE" kaggle_access_token
 
 if [ -d checkpoints ] && [ -n "$(ls -A checkpoints 2>/dev/null)" ]; then
   echo "== uploading local checkpoints/results/logs to resume"

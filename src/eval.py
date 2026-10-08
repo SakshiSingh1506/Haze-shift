@@ -11,6 +11,7 @@ Usage:
     python src/eval.py --config configs/protocol_a.yaml --checkpoint checkpoints/protocol_a/stage2_last.pt --tag A_stage2
     python src/eval.py --config configs/protocol_a.yaml --checkpoint checkpoints/protocol_a/stage1_best.pt --tag A_stage1_only
     python src/eval.py --config configs/protocol_a.yaml --dcp --tag A_DCP
+    python src/eval.py --config configs/protocol_a.yaml --identity --tag A_hazy_input   # no dehazing at all
 
 Requires: pip install lpips pyiqa
 """
@@ -64,6 +65,9 @@ def get_niqe_fn(device):
 
 def make_predictor(args, cfg, device, use_amp, amp_dtype):
     """Returns f(hazy_tensor[1,3,H,W] in [0,1]) -> dehazed tensor, for either the model or DCP."""
+    if args.identity:
+        # reference row: score the hazy input itself, i.e. "do nothing"
+        return lambda hazy: hazy.clamp(0, 1)
     if args.dcp:
         from baseline_dcp import dcp_dehaze
 
@@ -118,10 +122,11 @@ def main():
     parser.add_argument("--config", required=True)
     parser.add_argument("--checkpoint", help="model weights (state_dict); not needed with --dcp")
     parser.add_argument("--dcp", action="store_true", help="evaluate the classical DCP baseline instead of a model")
+    parser.add_argument("--identity", action="store_true", help="score the hazy input itself (no dehazing) as a reference")
     parser.add_argument("--tag", required=True, help="label for this run in metrics.csv, e.g. A_stage2")
     args = parser.parse_args()
-    if not args.dcp and not args.checkpoint:
-        parser.error("--checkpoint is required unless --dcp is given")
+    if not (args.dcp or args.identity or args.checkpoint):
+        parser.error("--checkpoint is required unless --dcp or --identity is given")
 
     cfg = load_config(args.config)
     device = get_device()
